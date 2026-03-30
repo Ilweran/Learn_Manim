@@ -29,15 +29,15 @@ class LorenzAttractor(ThreeDScene):
 
         self.add(axes)
 
-        #state0 = [10, 10, 10]
         epsilon = 0.001
-        evolution_time = 300
+        evolution_time = 150
         states = [
             [10, 10, 10 + n * epsilon]
                 for n in range(2)
         ]
 
-        colors = [BLUE, RED]
+        colors = color_gradient([BLUE, YELLOW], len(states))
+
         curves = VGroup()
         for state, color in zip(states, colors):
             points = ode_solution_points(lorenz_system, state, evolution_time)
@@ -47,56 +47,48 @@ class LorenzAttractor(ThreeDScene):
             # --- Draw thin attractor curve ---
             curve = VMobject()
             curve.set_points_smoothly(path_points)
-            curve.set_stroke(color, width=0.5)
+            curve.set_stroke(color, width=0.2)
             curve.set_color(color, 2)
             curves.add(curve)
-
-        # Camera angle
-        self.set_camera_orientation(phi=85 * DEGREES, theta=45 * DEGREES)
-        self.begin_ambient_camera_rotation(rate=0.1)
-
-        # Draw curve first
-        self.play(*(Create(curve, run_time=120, rate_func=linear) for curve in curves))
-
-        """
-        # Moving particle
-        dot = Dot3D(point=path_points[0], radius=0.05, color=RED)
-
-        # Animation parameter
-        tracker = ValueTracker(0)
-
-        # --- Trail ---
-        trail = VMobject(color=BLUE)
-
-        def update_trail(mob):
-            i = int(tracker.get_value())
-            i = min(i, len(path_points) - 1)
-            mob.move_to(path_points[i])
         
-        dot.add_updater(update_trail)
+        def create_3d_glow(dot, color=color, layers=8, radius_multiplier=2.5):
+            glow = Group()
+            for i in range(1, layers + 1):
+                # Calculate radius and opacity for each layer
+                layer_radius = dot.radius * (1 + (i / layers) * radius_multiplier)
+                opacity = 0.15 * (1 - i / layers)
 
-        # --- Dot updater ---
-        def update_dot(mob):
-            i = int(tracker.get_value())
-            i = min(i, len(path_points) - 1)
-            mob.move_to(path_points[i])
+                layer = Dot3D(
+                    point=dot.get_center(),
+                    radius=layer_radius,
+                    color=color,
+                    resolution=dot.resolution # Match resolution for consistency
+                ).set_opacity(opacity)
 
-        dot.add_updater(update_dot)
+                glow.add(layer)
+            return glow
 
-        self.add(trail, dot)
+        def CreateGlowDot(color):
+            
+            dot = Dot3D(radius=0.02, color=color)
+            glow = create_3d_glow(dot, color=color)
+            glowing_dot = Group(glow, dot)
+            return glowing_dot
+
+        dots_list = [CreateGlowDot(color) for color in colors]
+        dots = Group(*dots_list)
+
+
+        for dot, curve in zip(dots, curves):
+            dot.add_updater(lambda d, c=curve: d.move_to(c.get_end()))
 
         # Camera angle
-        self.set_camera_orientation(phi=45 * DEGREES, theta=75 * DEGREES)
+        self.set_camera_orientation(phi=85 * DEGREES, theta=15 * DEGREES)
         self.begin_ambient_camera_rotation(rate=0.1)
 
-        # Animate movement
-        self.play(
-            tracker.animate.set_value(len(path_points) - 1),
-            run_time=10,
-            rate_func=linear
-        )
+        # Draw curve
+        run_time = 200
+        self.add(dots)
+        self.play(*(Create(curve, run_time=run_time, rate_func=linear) for curve in curves))
 
-        dot.remove_updater(update_dot)
-        trail.remove_updater(update_trail)
-        """
         self.wait()
